@@ -4,6 +4,7 @@ USE IEEE.NUMERIC_STD.all;
 
 ENTITY blackjack IS
     PORT (
+
         key : IN STD_LOGIC_VECTOR(3 DOWNTO 0); -- random_cards => key(0), clock => key(1), key(2) => hit, key(3) => stay;
         sw : IN STD_LOGIC_VECTOR(1 DOWNTO 0); -- start/reset => sw(0);
 
@@ -12,9 +13,9 @@ ENTITY blackjack IS
 
         hex3 : OUT STD_LOGIC_VECTOR(6 DOWNTO 0); -- hexadecimal carta mão
 
-        ledr : OUT STD_LOGIC_VECTOR(9 DOWNTO 7); -- WIN;
-        ledr : OUT STD_LOGIC_VECTOR(5 DOWNTO 4); -- TIE;
-        ledr : OUT STD_LOGIC_VECTOR(2 DOWNTO 0); -- LOSE;
+        ledr : OUT STD_LOGIC_VECTOR(9 DOWNTO 0); -- WIN (9 a 7), TIE (5 a 4), LOSE (2 a 0);
+
+        win, tie, lose : OUT STD_LOGIC;
     );
 END blackjack;
 
@@ -24,6 +25,13 @@ ARCHITECTURE gurizes OF blackjack IS
         inicio,
         gera_aleatorio,
         circuito_externo,
+        entrega_jogador,
+        entrega_dealer,
+        pedir_carta_jogador,
+        finalizar_mao_jogador,
+        blackjack_jogador,
+        blackjack_dealer,
+        dealer_joga,
         jogador_vence_rodada,
         jogador_empata_rodada,
         jogador_perde_rodada,
@@ -88,10 +96,10 @@ BEGIN
                     next_state <= entrega_jogador;
                 ELSIF sum_cards_player = 21 THEN
                     next_state <= blackjack_jogador;
-                ELSIF hit = '1' THEN
+                ELSIF key(2) = '1' THEN -- hit
                     next_state <= pedir_carta_jogador;
-                ELSIF stay = '1' THEN 
-                    next_state <= finalizar_mão_jogador;
+                ELSIF key(3) = '1' THEN -- stay
+                    next_state <= finalizar_mao_jogador;
                 END IF;
 
             WHEN entrega_jogador =>
@@ -102,10 +110,73 @@ BEGIN
             WHEN entrega_dealer =>
                 IF distribui_jogador < 2 THEN
                     next_state <= entrega_jogador;
-                ELSIF distribui_jogador = 2 THEN
+                ELSE
                     next_state <= gera_aleatorio;
                 END IF;
 
+            WHEN pedir_carta_jogador => 
+                IF sum_cards_player > 21 THEN
+                    next_state <= jogador_perde_rodada;
+                ELSIF sum_cards_player = 21 THEN
+                    next_state <= blackjack_jogador;
+                ELSIF hit = '1' THEN
+                    next_state <= pedir_carta_jogador;
+                ELSIF stay = '1' THEN
+                    next_state <= finalizar_mao_jogador;
+                END IF;
+
+            WHEN finalizar_mao_jogador =>
+               next_state <= dealer_joga; 
+
+            WHEN blackjack_jogador => 
+                IF sum_cards_dealer < 21 THEN
+                    next_state <= dealer_joga;
+                ELSIF sum_cards_dealer = 21 THEN
+                    next_state <= blackjack_dealer;
+                END IF;
+
+            WHEN blackjack_dealer =>
+                IF sum_cards_player = 21 THEN
+                    next_state <= jogador_empata_rodada;
+                ELSIF sum_cards_player < 21 THEN
+                    next_stae <= jogador_perde_rodada;
+                END IF;
+
+            WHEN dealer_joga =>
+                IF sum_cards_dealer = 21 THEN
+                    next_state <= blackjack_dealer;
+                ELSIF sum_cards_dealer >= 17 THEN
+                    next_state <= finalizar_mao_dealer;
+                ELSE
+                    next_state <= pedir_carta_dealer;
+                END IF;
+
+            WHEN pedir_carta_dealer =>
+            IF sum_cards_dealer = 21 THEN
+                next_state <= blackjack_dealer;
+            ELSIF sum_cards_dealer >= 17 THEN
+                next_state <= finalizar_mao_dealer;
+            ELSE
+                next_state <= pedir_carta_dealer;
+            END IF;
+
+            WHEN finalizar_mao_dealer =>
+            IF sum_cards_dealer < sum_cards_player THEN
+                next_state <= jogador_vence_rodada;
+            ELSIF sum_cards_dealer = sum_cards_player THEN
+                next_state <= jogador_empata_rodada;
+            ELSE
+                next_state <= jogador_perde_rodada;
+            END IF;
+
+            WHEN jogador_vence_rodada =>
+                next_state <= inicio;
+
+            WHEN jogador_empata_rodada =>
+                next_state <= inicio;
+
+            WHEN jogador_perde_rodada =>
+                next_state <= inicio;
 
     END PROCESS;
 
@@ -117,7 +188,7 @@ BEGIN
     BEGIN
         CASE current_state IS
             WHEN inicio =>
-
+                -- aqui vai zerar todas as variáveis e reiniciar o jogo
             WHEN gera_aleatorio =>
 
 
@@ -154,12 +225,15 @@ BEGIN
                 hex3 <= card_to_hex(card);
 
             WHEN jogador_vence_rodada =>
+                win <= '1';
                 ledr(9 DOWNTO 7) <= "111"; -- WIN
             
             WHEN jogador_empata_rodada =>
+                tie <= '1';
                 ledr(5 DOWNTO 4) <= "11"; -- TIE
             
             WHEN jogador_perde_rodada =>
+                lose <= '1';
                 ledr(2 DOWNTO 0) <= "111"; -- LOSE
         
     END PROCESS;
