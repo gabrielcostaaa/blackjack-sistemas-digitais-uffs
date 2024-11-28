@@ -124,9 +124,9 @@ BEGIN
                     next_state <= jogador_perde_rodada;
                 ELSIF sum_cards_player = 21 THEN
                     next_state <= blackjack_jogador;
-                ELSIF hit = '1' THEN
+                ELSIF key(2) = '1' THEN -- hit
                     next_state <= pedir_carta_jogador;
-                ELSIF stay = '1' THEN
+                ELSIF key(3) = '1' THEN -- stay
                     next_state <= finalizar_mao_jogador;
                 END IF;
 
@@ -195,7 +195,7 @@ BEGIN
             WHEN inicio =>
                 -- aqui vai zerar todas as variáveis e reiniciar o jogo
             WHEN gera_aleatorio =>
-
+                -- mostrar sum_cards_player no display hex0 e hex1 em decimal
 
             WHEN entrega_jogador => 
                 indice := RANDOM_GENERATOR(distribui_jogador + distribui_dealer);
