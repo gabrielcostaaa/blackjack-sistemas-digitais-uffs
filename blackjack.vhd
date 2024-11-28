@@ -28,7 +28,9 @@ ARCHITECTURE gurizes OF blackjack IS
         entrega_jogador,
         entrega_dealer,
         pedir_carta_jogador,
+        pedir_carta_dealer,
         finalizar_mao_jogador,
+        finalizar_mao_dealer,
         blackjack_jogador,
         blackjack_dealer,
         dealer_joga,
@@ -102,6 +104,9 @@ BEGIN
                     next_state <= finalizar_mao_jogador;
                 END IF;
 
+            WHEN circuito_externo =>
+
+
             WHEN entrega_jogador =>
                 IF distribui_dealer < 2 THEN
                     next_state <= entrega_dealer;
@@ -125,8 +130,26 @@ BEGIN
                     next_state <= finalizar_mao_jogador;
                 END IF;
 
+            WHEN pedir_carta_dealer =>
+                IF sum_cards_dealer = 21 THEN
+                    next_state <= blackjack_dealer;
+                ELSIF sum_cards_dealer >= 17 THEN
+                    next_state <= finalizar_mao_dealer;
+                ELSE
+                    next_state <= pedir_carta_dealer;
+                END IF;
+
             WHEN finalizar_mao_jogador =>
-               next_state <= dealer_joga; 
+               next_state <= dealer_joga;
+
+            WHEN finalizar_mao_dealer =>
+               IF sum_cards_dealer < sum_cards_player THEN
+                   next_state <= jogador_vence_rodada;
+               ELSIF sum_cards_dealer = sum_cards_player THEN
+                   next_state <= jogador_empata_rodada;
+               ELSE
+                   next_state <= jogador_perde_rodada;
+               END IF;
 
             WHEN blackjack_jogador => 
                 IF sum_cards_dealer < 21 THEN
@@ -150,24 +173,6 @@ BEGIN
                 ELSE
                     next_state <= pedir_carta_dealer;
                 END IF;
-
-            WHEN pedir_carta_dealer =>
-            IF sum_cards_dealer = 21 THEN
-                next_state <= blackjack_dealer;
-            ELSIF sum_cards_dealer >= 17 THEN
-                next_state <= finalizar_mao_dealer;
-            ELSE
-                next_state <= pedir_carta_dealer;
-            END IF;
-
-            WHEN finalizar_mao_dealer =>
-            IF sum_cards_dealer < sum_cards_player THEN
-                next_state <= jogador_vence_rodada;
-            ELSIF sum_cards_dealer = sum_cards_player THEN
-                next_state <= jogador_empata_rodada;
-            ELSE
-                next_state <= jogador_perde_rodada;
-            END IF;
 
             WHEN jogador_vence_rodada =>
                 next_state <= inicio;
