@@ -1,246 +1,279 @@
-LIBRARY IEEE;
-USE IEEE.STD_LOGIC_1164.all;
-USE IEEE.NUMERIC_STD.all;
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+use ieee.std_logic_unsigned.all;
 
-ENTITY blackjack IS
-    PORT (
+entity blackjack is
+    port (
+        key : IN STD_LOGIC_VECTOR(3 DOWNTO 0); -- key(2) => START/RESET; key(3) => CLOCK;
+        sw : IN STD_LOGIC_VECTOR(1 DOWNTO 0); -- sw(6) => HIT; sw(7) => STAY; sw(3), sw(2), sw(1), sw(0) => CARTA_CIRCUITO_EXTERNO;
 
-        key : IN STD_LOGIC_VECTOR(3 DOWNTO 0); -- random_cards => key(0), clock => key(1), key(2) => hit, key(3) => stay;
-        sw : IN STD_LOGIC_VECTOR(1 DOWNTO 0); -- start/reset => sw(0);
+        hex0 : out std_logic_vector(6 downto 0); -- unidade soma cartas decimal
+        hex1 : out std_logic_vector(6 downto 0); -- dezena soma cartas decimal
+        hex2 : out std_logic_vector(6 downto 0); -- usado para escrever em alguns estados
+        hex3 : out std_logic_vector(6 downto 0); -- hexadecimal carta mão
 
-        hex0 : OUT STD_LOGIC_VECTOR(6 DOWNTO 0); -- unidades soma cartas decimal
-        hex1 : OUT STD_LOGIC_VECTOR(6 DOWNTO 0); -- dezenas soma cartas decimal
-
-        hex3 : OUT STD_LOGIC_VECTOR(6 DOWNTO 0); -- hexadecimal carta mão
-
-        ledr : OUT STD_LOGIC_VECTOR(9 DOWNTO 0); -- WIN (9 a 7), TIE (5 a 4), LOSE (2 a 0);
-
-        win, tie, lose : OUT STD_LOGIC;
+        ledR : out std_logic_vector(9 downto 0); -- WIN (7,8,9); TIE (4,5); LOSE (0,1,2);
     );
-END blackjack;
+end blackjack;
 
-ARCHITECTURE gurizes OF blackjack IS
+architecture gurizes of blackjack is
 
-    TYPE state_type IS (
+    type tipo_estado is (
         inicio,
-        gera_aleatorio,
-        circuito_externo,
-        entrega_jogador,
-        entrega_dealer,
-        pedir_carta_jogador,
-        pedir_carta_dealer,
-        finalizar_mao_jogador,
-        finalizar_mao_dealer,
-        blackjack_jogador,
-        blackjack_dealer,
-        dealer_joga,
-        jogador_vence_rodada,
-        jogador_empata_rodada,
-        jogador_perde_rodada,
+        jogador,
+        jogador_as,
+        carteador,
+        carteador_as,
+        resultado,
     );
-    SIGNAL current_state, next_state : state_type;
 
-    SIGNAL cheap    : STD_LOGIC_VECTOR(51 DOWNTO 0) := (OTHERS => '1'); -- baralho
+    signal estado_atual : tipo_estado := inicio;
 
-    SIGNAL card : STD_LOGIC_VECTOR(3 DOWNTO 0) := (OTHERS => '0'); -- valor da carta que esta agora
-    SIGNAL random_card_index : INTEGER RANGE 0 TO 51;
+    signal carta_atual : std_logic_vector(3 downto 0) := "0000";
+    signal carta_circuito_externo : std_logic_vector(3 downto 0) := "0000";
 
-    SIGNAL sum_cards_player : INTEGER RANGE 0 TO 30 := 0; -- soma dos valores das cartas na mão
-    SIGNAL sum_cards_dealer : INTEGER RANGE 0 TO 30 := 0; -- soma dos valores das cartas na mão
+    signal soma_cartas_jogador : std_logic_vector(5 downto 0) := "000000";
+    signal soma_cartas_carteador : std_logic_vector(5 downto 0) := "000000";
 
-    SIGNAL distribui_jogador : INTEGER RANGE 0 TO 2 := 0; -- quantidade de cartas que pegou no inicio
-    SIGNAL distribui_dealer : INTEGER RANGE 0 TO 2 := 0; -- quantidade de cartas que pegou no inicio
+    signal possui_as : std_logic_vector(1 downto 0) := "00";
 
-    FUNCTION card_to_hex(card : STD_LOGIC_VECTOR(3 DOWNTO 0)) RETURN STD_LOGIC_VECTOR IS
-        VARIABLE hex_pattern : STD_LOGIC_VECTOR(6 DOWNTO 0);
-    BEGIN
-        CASE card IS
-            WHEN "0001" => hex_pattern := "0110000"; -- 1
-            WHEN "0010" => hex_pattern := "1101101"; -- 2
-            WHEN "0011" => hex_pattern := "1111001"; -- 3
-            WHEN "0100" => hex_pattern := "0110011"; -- 4
-            WHEN "0101" => hex_pattern := "1011011"; -- 5
-            WHEN "0110" => hex_pattern := "1011111"; -- 6
-            WHEN "0111" => hex_pattern := "1110000"; -- 7
-            WHEN "1000" => hex_pattern := "1111111"; -- 8
-            WHEN "1001" => hex_pattern := "1111011"; -- 9
-            WHEN "1010" => hex_pattern := "1110111"; -- A (10)
-            WHEN "1011" => hex_pattern := "0011111"; -- b (11)
-            WHEN OTHERS => hex_pattern := "0000000"; -- Tudo apagado
-        END CASE;
-        RETURN hex_pattern;
-    END card_to_hex;
+    signal distribui : std_logic_vector(1 downto 0) := "00";
 
-BEGIN
+    function conversao_hexadecimal(carta : std_logic_vector(3 downto 0)) return std_logic_vector is
+    begin
+        case carta is
+            when "0000" => return "1000000"; -- 0
+            when "0001" => return "1111100"; -- 1
+            when "0010" => return "0100100"; -- 2
+            when "0011" => return "0110000"; -- 3
+            when "0100" => return "0011001"; -- 4
+            when "0101" => return "0010010"; -- 5
+            when "0110" => return "0000010"; -- 6
+            when "0111" => return "1111000"; -- 7
+            when "1000" => return "0000000"; -- 8
+            when "1001" => return "0010000"; -- 9
+            when "1010" => return "0001000"; -- a (10)
+            when "1011" => return "0000011"; -- b (11)
+            when "1100" => return "1000110"; -- c (12)
+            when "1101" => return "0100001"; -- d (13)
+            when others => return "1111111"; -- tudo apagado
+        end case;
+    end conversao_hexadecimal;
 
-    PROCESS(key(1), sw(0))
-    BEGIN
-        IF sw(0) = '1' THEN
-            current_state <= inicio;
-        ELSIF falling_edge(key(1)) THEN
-            current_state <= next_state;
-        END IF;
-    END PROCESS;
+    function conversao_unidade(valor : std_logic_vector(5 downto 0)) return std_logic_vector is
+    begin
+        case valor is
+            when "000000" => return "1000000";
+            when "000001" => return "1111001";
+            when "000010" => return "0100100";
+            when "000011" => return "0110000";
+            when "000100" => return "0011001";
+            when "000101" => return "0010010";
+            when "000110" => return "0000010";
+            when "000111" => return "1111000";
+            when "001000" => return "0000000";
+            when "001001" => return "0010000";
 
-    -- LÓGICA DE TRANSIÇÃO DE ESTADOS
-    PROCESS(current_state)
-    BEGIN
-        CASE current_state IS
-            WHEN inicio =>
-                IF key(0) = '1' THEN -- se random_cards = 1
-                    next_state <= gera_aleatorio;
-                ELSE
-                    next_state <= circuito_externo;
-                END IF;
+            when "001010" => return "1000000";
+            when "001011" => return "1111001";
+            when "001100" => return "0100100";
+            when "001101" => return "0110000";
+            when "001110" => return "0011001";
+            when "001111" => return "0010010";
+            when "010000" => return "0000010";
+            when "010001" => return "1111000";
+            when "010010" => return "0000000";
+            when "010011" => return "0010000";
+
+            when "010100" => return "1000000";
+            when "010101" => return "1111100";
+            when "010110" => return "0100100";
+            when "010111" => return "0110000";
+            when "011000" => return "0011001";
+            when "011001" => return "0010010";
+            when "011010" => return "0000010";
+            when "011011" => return "1111000";
+            when "011100" => return "0000000";
+            when "011101" => return "0010000";
+
+            when others => return "1000000";
+        end case;
+    end function conversao_unidade;
+
+    function conversao_dezena(numero : std_logic_vector(5 downto 0)) return std_logic_vector is
+    begin
+        if (numero < 10) then
+            return "1000000";
+        elsif (numero < 20) then
+            return "1111001";
+        elsif (numero < 30) then
+            return "0100100";
+        elsif (numero < 40) then
+            return "0110000";
+        end if;
+        return "1000000";
+    end function conversao_dezena;
+
+begin
+
+    process(key(2), key(3)) -- key(2) => start/reset; key(3) => clock;
+    begin
+        if (key(2) = '0') then -- start/reset
+
+            soma_cartas_jogador <= "000000";
+            soma_cartas_carteador <= "000000";
+            distribui <= "00";
+            possui_as <= "00";
+
+            hex3 <= "0010010";
+            hex2 <= "1111000";
+            hex1 <= "0011001";
+            hex0 <= "1111000";
+
+            estado_atual <= inicio;
+
+        elsif falling_edge(key(3)) then -- lógica de transição de estados embutida no process do clock
             
-            WHEN gera_aleatorio =>
-                IF distribui_jogador AND distribui_dealer < 2 THEN
-                    next_state <= entrega_jogador;
-                ELSIF sum_cards_player = 21 THEN
-                    next_state <= blackjack_jogador;
-                ELSIF key(2) = '1' THEN -- hit
-                    next_state <= pedir_carta_jogador;
-                ELSIF key(3) = '1' THEN -- stay
-                    next_state <= finalizar_mao_jogador;
-                END IF;
+            if ((distribui /= "01" and estado_atual = inicio) or ((estado_atual = jogador or estado_atual = jogador_as) and sw(7) /= '1')) then
+                hex3 <= conversao_hexadecimal(carta_circuito_externo);
+            end if;
 
-            WHEN circuito_externo =>
+            if (estado_atual = inicio) then
+                if (distribui(0) = '0') then
+                    if (carta_atual = "000001") then
+                        possui_as(0) <= '1';
+                    end if;
 
+                    soma_cartas_jogador <= soma_cartas_jogador + carta_atual;
+                    hex1 <= conversao_dezena(soma_cartas_jogador + carta_atual);
+                    hex0 <= conversao_unidade(soma_cartas_jogador + carta_atual);
 
-            WHEN entrega_jogador =>
-                IF distribui_dealer < 2 THEN
-                    next_state <= entrega_dealer;
-                END IF;
+                    distribui(0) <= '1';
+                else
+                    if (carta_atual = "000001") then
+                        possui_as(1) <= '1';
+                    end if;
 
-            WHEN entrega_dealer =>
-                IF distribui_jogador < 2 THEN
-                    next_state <= entrega_jogador;
-                ELSE
-                    next_state <= gera_aleatorio;
-                END IF;
+                    soma_cartas_carteador <= soma_cartas_carteador + carta_atual;
 
-            WHEN pedir_carta_jogador => 
-                IF sum_cards_player > 21 THEN
-                    next_state <= jogador_perde_rodada;
-                ELSIF sum_cards_player = 21 THEN
-                    next_state <= blackjack_jogador;
-                ELSIF key(2) = '1' THEN -- hit
-                    next_state <= pedir_carta_jogador;
-                ELSIF key(3) = '1' THEN -- stay
-                    next_state <= finalizar_mao_jogador;
-                END IF;
+                    if (distribui = "01") then
+                        distribui <= "10";
+                    else
+                        if (possui_as(0) = '1') then
+                            estado_atual <= jogador_as;
+                        else
+                            estado_atual <= user;
+                        end if;
+                    end if;
+                end if;
+            end if;
 
-            WHEN pedir_carta_dealer =>
-                IF sum_cards_dealer = 21 THEN
-                    next_state <= blackjack_dealer;
-                ELSIF sum_cards_dealer >= 17 THEN
-                    next_state <= finalizar_mao_dealer;
-                ELSE
-                    next_state <= pedir_carta_dealer;
-                END IF;
+            if (estado_atual = jogador) then
+                if (sw(7) = '1') then -- STAY
+                    if (possui_as(1) = '1') then
+                        estado_atual <= carteador_as;
+                    else
+                        estado_atual <= carteador;
+                    end if;
+                elsif (sw(7) = '1') then -- HIT
+                    if (soma_cartas_jogador + carta_atual > 21) then
+                        soma_cartas_jogador <= soma_cartas_jogador + carta_atual;
+                        estado_atual <= resultado;
+                    else
+                        soma_cartas_jogador <= soma_cartas_jogador + carta_atual;
+                        hex1 <= conversao_dezena(soma_cartas_jogador + carta_atual);
+                        hex0 <= conversao_unidade(soma_cartas_jogador + carta_atual);
+                    end if; 
 
-            WHEN finalizar_mao_jogador =>
-               next_state <= dealer_joga;
+                    if (carta_atual = "000001") then
+                        estado_atual <= jogador_as;
+                    end if;
+            end if;
 
-            WHEN finalizar_mao_dealer =>
-               IF sum_cards_dealer < sum_cards_player THEN
-                   next_state <= jogador_vence_rodada;
-               ELSIF sum_cards_dealer = sum_cards_player THEN
-                   next_state <= jogador_empata_rodada;
-               ELSE
-                   next_state <= jogador_perde_rodada;
-               END IF;
+            if (estado_atual = jogador_as) then
+                if (sw(7) = '1') then -- STAY
+                    if (possui_as(0) = '1' and soma_cartas_jogador + 10 < 22) then
+                        soma_cartas_jogador <= soma_cartas_jogador + 10;
+                        hex1 <= conversao_dezena(soma_cartas_jogador + 10);
+                        hex0 <= conversao_unidade(soma_cartas_jogador + 10);
+                    end if;
+                    if (possui_as(1) = '1') then
+                        estado_atual <= carteador_as;
+                    else
+                        estado_atual <= carteador;
+                    end if;
+                elsif (sw(6) = '1') then -- HIT
+                    if (soma_cartas_jogador + carta_atual > 21) then
+                        soma_cartas_jogador <= soma_cartas_jogador + carta_atual;
+                        estado_atual <= resultado;
+                    else
+                        soma_cartas_jogador <= soma_cartas_jogador + carta_atual;
+                        hex1 <= conversao_dezena(soma_cartas_jogador + carta_atual);
+                        hex0 <= conversao_unidade(soma_cartas_jogador + carta_atual);
+                    end if; 
 
-            WHEN blackjack_jogador => 
-                IF sum_cards_dealer < 21 THEN
-                    next_state <= dealer_joga;
-                ELSIF sum_cards_dealer = 21 THEN
-                    next_state <= blackjack_dealer;
-                END IF;
+                    if (carta_atual = "000001") then
+                        estado_atual <= jogador_as;
+                    end if;
+                end if;
+            end if;
 
-            WHEN blackjack_dealer =>
-                IF sum_cards_player = 21 THEN
-                    next_state <= jogador_empata_rodada;
-                ELSIF sum_cards_player < 21 THEN
-                    next_stae <= jogador_perde_rodada;
-                END IF;
+            if (estado_atual = carteador) then
+                if (soma_cartas_carteador < 17) then
 
-            WHEN dealer_joga =>
-                IF sum_cards_dealer = 21 THEN
-                    next_state <= blackjack_dealer;
-                ELSIF sum_cards_dealer >= 17 THEN
-                    next_state <= finalizar_mao_dealer;
-                ELSE
-                    next_state <= pedir_carta_dealer;
-                END IF;
+                    soma_cartas_carteador <= soma_cartas_carteador + carta_atual;
 
-            WHEN jogador_vence_rodada =>
-                next_state <= inicio;
+                    if (soma_cartas_carteador + carta_atual > 21) then
+                        estado_atual = resultado;
+                    end if;
 
-            WHEN jogador_empata_rodada =>
-                next_state <= inicio;
+                    if (carta_atual = "000001") then
+                        estado_atual <= carteador_as;
+                    end if;
 
-            WHEN jogador_perde_rodada =>
-                next_state <= inicio;
+                else
+                    estado_atual <= resultado;
+                end if;
+            end if;
 
-    END PROCESS;
+            if (estado_atual = carteador_as) then
+                if (soma_cartas_carteador + 10 < 17) then
+                    soma_cartas_carteador <= soma_cartas_carteador + carta_atual;
+                    if (soma_cartas_carteador + carta_atual > 21) then
+                        estado_atual <= resultado;
+                    end if;
+                else
+                    if (soma_cartas_carteador + 10 < 22) then
+                        soma_cartas_carteador <= soma_cartas_carteador + 10;
+                    end if;
+                    estado_atual <= resultado;
+                end if;
+            end if;
 
-    -- LÓGICA DE OPERAÇÃO E SAÍDAS
-    PROCESS(current_state)
+        end if;
+    end process;
 
-    VARIABLE indice : INTEGER RANGE 0 TO 51;
+    process (estado_atual)
+    begin
 
-    BEGIN
-        CASE current_state IS
-            WHEN inicio =>
-                -- aqui vai zerar todas as variáveis e reiniciar o jogo
-            WHEN gera_aleatorio =>
-                -- mostrar sum_cards_player no display hex0 e hex1 em decimal
-
-            WHEN entrega_jogador => 
-                indice := RANDOM_GENERATOR(distribui_jogador + distribui_dealer);
-
-                WHILE cheap(indice) = '0' LOOP
-                        indice := RANDOM_GENERATOR(indice); -- Gera novo índice
-                END LOOP;
-
-                cheap(indice) <= '0'; -- carta retirada do baralho
-                card <= STD_LOGIC_VECTOR(TO_UNSIGNED((indice / 4) + 1, 4)); -- passa valor da carta a card
-
-                sum_cards_player <= sum_cards_player + card;
-
-                distribui_jogador <= distribui_jogador + 1;
-
-                hex3 <= card_to_hex(card);
-
-            WHEN entrega_dealer =>
-                indice := RANDOM_GENERATOR(distribui_jogador + distribui_dealer);
-
-                WHILE cheap(indice) = '0' LOOP
-                        indice := RANDOM_GENERATOR(indice); -- Gera novo índice
-                END LOOP;
-
-                cheap(indice) <= '0'; -- carta retirada do baralho
-                card <= STD_LOGIC_VECTOR(TO_UNSIGNED((indice / 4) + 1, 4)); -- passa valor da carta a card
-
-                sum_cards_dealer <= sum_cards_dealer + card;
-
-                distribui_dealer <= distribui_dealer + 1;
-
-                hex3 <= card_to_hex(card);
-
-            WHEN jogador_vence_rodada =>
-                win <= '1';
-                ledr(9 DOWNTO 7) <= "111"; -- WIN
-            
-            WHEN jogador_empata_rodada =>
-                tie <= '1';
-                ledr(5 DOWNTO 4) <= "11"; -- TIE
-            
-            WHEN jogador_perde_rodada =>
-                lose <= '1';
-                ledr(2 DOWNTO 0) <= "111"; -- LOSE
-        
-    END PROCESS;
-
+        if (estado_atual = resultado)
+            -- WIN
+            if (soma_cartas_jogador > 21 or (soma_cartas_jogador < soma_cartas_carteador and soma_cartas_carteador < 22)) then
+                ledR(0) <= '1';
+                ledR(1) <= '1';
+                ledR(2) <= '1';
+            -- LOSE
+            elsif (soma_cartas_carteador > 21 or soma_cartas_carteador < soma_cartas_jogador) then
+                ledR(7) <= '1';
+                ledR(8) <= '1';
+                ledR(9) <= '1';
+            -- TIE
+            else
+                ledR(4) <= '1';
+                ledR(5) <= '1';
+            end if;
+        end if;
+    end process;
+    
 END gurizes;
