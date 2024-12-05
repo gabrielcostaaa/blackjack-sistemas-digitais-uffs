@@ -73,7 +73,7 @@ architecture gurizes of blackjack is
     function conversao_unidade(valor : integer) return std_logic_vector is
     begin
         case valor is
-            when 0 => return "0000000";
+            when 0 => return "1101111";
             when 1 => return "0000110";
             when 2 => return "1011011";
             when 3 => return "0011111";
@@ -83,7 +83,7 @@ architecture gurizes of blackjack is
             when 7 => return "0000111";
             when 8 => return "1111111";
             when 9 => return "0111111";
-            when 10 => return "0000000";
+            when 10 => return "1101111";
             when 11 => return "0000110";
             when 12 => return "1011011";
             when 13 => return "0011111";
@@ -125,6 +125,11 @@ begin
             distribui <= "00";
             possui_as <= "00";
             estado_atual <= inicio;
+            hex0 <= "0000111";
+            hex1 <= "1111001";
+            hex2 <= "0111101";
+            hex3 <= "1100011";
+            ledR <= "0000000000";
 
         elsif falling_edge(clk) then  -- lógica de transição de estados embutida no process do clock
             -- Atualizar hex3 com a carta do circuito externo
@@ -150,8 +155,10 @@ begin
                     end if;
                     soma_cartas_carteador <= soma_cartas_carteador + to_integer(unsigned(carta_atual));
                     distribui <= "10";
-                    estado_atual <= jogador;
                 end if;
+                    if (distribui(0) = '1' AND distribui(1) = '1') then
+                    estado_atual <= jogador;
+                    end if;
             end if;
 
             -- Estado de 'jogador'
