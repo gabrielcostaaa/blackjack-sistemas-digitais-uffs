@@ -7,12 +7,12 @@
       <elementName>External</elementName>
       <elementAttributes>
         <entry>
-          <string>Label</string>
-          <string>blackjack</string>
-        </entry>
-        <entry>
           <string>applicationType</string>
           <appType>GHDL</appType>
+        </entry>
+        <entry>
+          <string>Label</string>
+          <string>blackjack</string>
         </entry>
         <entry>
           <string>externalInputs</string>
@@ -147,6 +147,11 @@ begin
             distribui &lt;= &quot;00&quot;;
             possui_as &lt;= &quot;00&quot;;
             estado_atual &lt;= inicio;
+            hex0 &lt;= &quot;0000111&quot;;
+            hex1 &lt;= &quot;1111001&quot;;
+            hex2 &lt;= &quot;0111101&quot;;
+            hex3 &lt;= &quot;1100011&quot;;
+            ledR &lt;= &quot;0000000000&quot;;
 
         elsif falling_edge(clk) then  -- lógica de transição de estados embutida no process do clock
             -- Atualizar hex3 com a carta do circuito externo
@@ -172,8 +177,10 @@ begin
                     end if;
                     soma_cartas_carteador &lt;= soma_cartas_carteador + to_integer(unsigned(carta_atual));
                     distribui &lt;= &quot;10&quot;;
-                    estado_atual &lt;= jogador;
                 end if;
+                    if (distribui(0) = &apos;1&apos; AND distribui(1) = &apos;1&apos;) then
+                    estado_atual &lt;= jogador;
+                    end if;
             end if;
 
             -- Estado de &apos;jogador&apos;
