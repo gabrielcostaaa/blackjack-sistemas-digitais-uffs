@@ -37,8 +37,8 @@ architecture gurizes of blackjack is
     signal carta_atual : std_logic_vector(3 downto 0) := "0000";
     signal carta_circuito_externo : std_logic_vector(3 downto 0) := "0000";
 
-    signal soma_cartas_jogador : unsigned(5 downto 0) := "000000";
-    signal soma_cartas_carteador : unsigned(5 downto 0) := "000000";
+    signal soma_cartas_jogador : integer := 0;
+    signal soma_cartas_carteador : integer := 0;
 
     signal possui_as : std_logic_vector(1 downto 0) := "00";
 
@@ -70,33 +70,47 @@ architecture gurizes of blackjack is
         end case;
     end conversao_hexadecimal;
 
-    function conversao_unidade(valor : std_logic_vector(5 downto 0)) return std_logic_vector is
+    function conversao_unidade(valor : integer) return std_logic_vector is
     begin
         case valor is
-            when "000000" => return "0000000";
-            when "000001" => return "0000110";
-            when "000010" => return "1011011";
-            when "000011" => return "0011111";
-            when "000100" => return "0110110";
-            when "000101" => return "0111101";
-            when "000110" => return "1111101";
-            when "000111" => return "0000111";
-            when "001000" => return "1111111";
-            when "001001" => return "0111111";
-            when others => return "1000000";  -- Default
+            when 0 => return "0000000";
+            when 1 => return "0000110";
+            when 2 => return "1011011";
+            when 3 => return "0011111";
+            when 4 => return "0110110";
+            when 5 => return "0111101";
+            when 6 => return "1111101";
+            when 7 => return "0000111";
+            when 8 => return "1111111";
+            when 9 => return "0111111";
+            when 10 => return "0000000";
+            when 11 => return "0000110";
+            when 12 => return "1011011";
+            when 13 => return "0011111";
+            when 14 => return "0110110";
+            when 15 => return "0111101";
+            when 16 => return "1111101";
+            when 17 => return "0000111";
+            when 18 => return "1111111";
+            when 19 => return "0111111";
+            when 20 => return "0000000";
+            when 21 => return "0000110";
+            when 22 => return "1011011";
+            when 23 => return "0011111";
+            when others => return "0000000"; -- tudo apagado
         end case;
     end function conversao_unidade;
 
-    function conversao_dezena(numero : std_logic_vector(5 downto 0)) return std_logic_vector is
+    function conversao_dezena(numero : integer) return std_logic_vector is
     begin
         if (numero < 10) then
-            return "1000000";
+            return "0000000";
         elsif (numero < 20) then
-            return "1111001";
+            return "0000110";
         elsif (numero < 30) then
-            return "0100100";
+            return "1011011";
         elsif (numero < 40) then
-            return "0110000";
+            return "0011111";
         end if;
         return "1000000";  -- Default case
     end function conversao_dezena;
@@ -105,9 +119,9 @@ begin
 
     process(start_reset, clk)  -- start_reset => start/reset; clk => clock;
     begin
-        if (start_reset = '0') then  -- start/reset
-            soma_cartas_jogador <= "000000";
-            soma_cartas_carteador <= "000000";
+        if (start_reset = '1') then  -- start/reset
+            soma_cartas_jogador <= 0;
+            soma_cartas_carteador <= 0;
             distribui <= "00";
             possui_as <= "00";
             estado_atual <= inicio;
@@ -120,19 +134,21 @@ begin
 
             -- Lógica de distribuição de cartas no estado 'inicio'
             if (estado_atual = inicio) then
+                hex2 <= "0010000"; --identifica se ta no estado de inicio
                 if (distribui(0) = '0') then
                     if (carta_atual = "000001") then
                         possui_as(0) <= '1';
                     end if;
-                    soma_cartas_jogador <= soma_cartas_jogador + unsigned(carta_atual);
-                    temp_hex1 <= conversao_dezena(std_logic_vector(soma_cartas_jogador + unsigned(carta_atual)));
-                    temp_hex0 <= conversao_unidade(std_logic_vector(soma_cartas_jogador + unsigned(carta_atual)));
+                    soma_cartas_jogador <= soma_cartas_jogador + to_integer(unsigned(carta_atual));
+                    hex1 <= conversao_dezena(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
+                    hex0 <= conversao_unidade(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
+
                     distribui(0) <= '1';
                 else
                     if (carta_atual = "000001") then
                         possui_as(1) <= '1';
                     end if;
-                    soma_cartas_carteador <= soma_cartas_carteador + unsigned(carta_atual);
+                    soma_cartas_carteador <= soma_cartas_carteador + to_integer(unsigned(carta_atual));
                     distribui <= "10";
                     estado_atual <= jogador;
                 end if;
@@ -140,6 +156,7 @@ begin
 
             -- Estado de 'jogador'
             if (estado_atual = jogador) then
+                hex2 <= "0011000"; --identifica se ta no estado de inicio
                 if (stay = '1') then  -- STAY
                     if (possui_as(1) = '1') then
                         estado_atual <= carteador_as;
@@ -147,12 +164,12 @@ begin
                         estado_atual <= carteador;
                     end if;
                 elsif (hit = '1') then  -- HIT
-                    soma_cartas_jogador <= soma_cartas_jogador + unsigned(carta_atual);
+                    soma_cartas_jogador <= soma_cartas_jogador + to_integer(unsigned(carta_atual));
                     if (soma_cartas_jogador > 21) then
                         estado_atual <= resultado;
                     else
-                        temp_hex1 <= conversao_dezena(std_logic_vector(soma_cartas_jogador + unsigned(carta_atual)));
-                        temp_hex0 <= conversao_unidade(std_logic_vector(soma_cartas_jogador + unsigned(carta_atual)));
+                        hex1 <= conversao_dezena(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
+                        hex0 <= conversao_unidade(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
                     end if;
                 end if;
             end if;
@@ -163,20 +180,20 @@ begin
                     if (possui_as(0) = '1' and soma_cartas_jogador + 10 < 22) then
                         soma_cartas_jogador <= soma_cartas_jogador + 10;
                         -- Atualizar os displays
-                        temp_hex1 <= conversao_dezena(std_logic_vector(soma_cartas_jogador + 10));
-                        temp_hex0 <= conversao_unidade(std_logic_vector(soma_cartas_jogador + 10));
+                        hex1 <= conversao_dezena(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
+                        hex0 <= conversao_unidade(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
                     elsif (possui_as(1) = '1') then  -- Carteador com Ás
                         estado_atual <= carteador_as;
                     else
                         estado_atual <= carteador;
                     end if;
                 elsif (hit = '1') then  -- HIT
-                    soma_cartas_jogador <= soma_cartas_jogador + unsigned(carta_atual);
+                    soma_cartas_jogador <= soma_cartas_jogador + to_integer(unsigned(carta_atual));
                     if (soma_cartas_jogador > 21) then
                         estado_atual <= resultado;
                     else
-                        temp_hex1 <= conversao_dezena(std_logic_vector(soma_cartas_jogador + unsigned(carta_atual)));
-                        temp_hex0 <= conversao_unidade(std_logic_vector(soma_cartas_jogador + unsigned(carta_atual)));
+                        hex1 <= conversao_dezena(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
+                        hex0 <= conversao_unidade(soma_cartas_jogador + to_integer(unsigned(carta_atual)));
                     end if;
                 end if;
             end if;
@@ -184,8 +201,8 @@ begin
             -- Estado de 'carteador'
             if (estado_atual = carteador) then
                 if (soma_cartas_carteador < 17) then
-                    soma_cartas_carteador <= soma_cartas_carteador + unsigned(carta_atual);
-                    if (soma_cartas_carteador + unsigned(carta_atual) > 21) then
+                    soma_cartas_carteador <= soma_cartas_carteador + to_integer(unsigned(carta_atual));
+                    if (soma_cartas_carteador + to_integer(unsigned(carta_atual)) > 21) then
                         estado_atual <= resultado;
                     end if;
                     if (carta_atual = "000001") then
@@ -199,8 +216,8 @@ begin
             -- Estado de 'carteador_as' (quando o carteador tem um Ás)
             if (estado_atual = carteador_as) then
                 if (soma_cartas_carteador + 10 < 17) then
-                    soma_cartas_carteador <= soma_cartas_carteador + unsigned(carta_atual);
-                    if (soma_cartas_carteador + unsigned(carta_atual) > 21) then
+                    soma_cartas_carteador <= soma_cartas_carteador + to_integer(unsigned(carta_atual));
+                    if (soma_cartas_carteador + to_integer(unsigned(carta_atual)) > 21) then
                         estado_atual <= resultado;
                     end if;
                 else
